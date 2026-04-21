@@ -33,6 +33,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
         <option value='custom'>Custom (manual payloads)</option>
         <option value='default'>Default Leviton (status)</option>
         <option value='d26hd'>Leviton D26HD Dimmer (power)</option>
+        <option value='dw15p'>Leviton DW15P Outlet (power)</option>
       </select>
       <small class='form-text text-muted'>Selecting a profile auto-fills Level Key and On/Off payloads.</small>
     </div>
@@ -106,6 +107,12 @@ $pluginName = 'fpp-plugin-leviton-direct';
       onPayload: '{"power":"ON"}',
       offPayload: '{"power":"OFF"}',
       levelPayload: '{"power":"ON","brightness":"__LEVEL__"}'
+    },
+    dw15p: {
+      levelKey: 'brightness',
+      onPayload: '{"power":"ON"}',
+      offPayload: '{"power":"OFF"}',
+      levelPayload: '{"power":"ON"}'
     }
   };
 
@@ -151,6 +158,11 @@ $pluginName = 'fpp-plugin-leviton-direct';
 
     if (levelKey === profiles.d26hd.levelKey && onPayload === profiles.d26hd.onPayload && offPayload === profiles.d26hd.offPayload && levelPayload === profiles.d26hd.levelPayload) {
       select.value = 'd26hd';
+      return;
+    }
+
+    if (levelKey === profiles.dw15p.levelKey && onPayload === profiles.dw15p.onPayload && offPayload === profiles.dw15p.offPayload && levelPayload === profiles.dw15p.levelPayload) {
+      select.value = 'dw15p';
       return;
     }
 
