@@ -62,6 +62,20 @@ commands/leviton_action.sh --list
 - If `status` or `brightness` does not work for your device, use `raw` action.
 - You can discover switch IDs by temporarily using your bridge app (`/api/switches`) or by adding your own listing script.
 
+## Troubleshooting
+
+If `--list` returns `ModuleNotFoundError: No module named 'decora_wifi'`, run:
+
+```bash
+bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/scripts/fpp_install.sh
+```
+
+If that still fails, install manually:
+
+```bash
+python3 -m pip install --target /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_libs decora-wifi
+```
+
 ## License
 
 MIT License. See `LICENSE`.

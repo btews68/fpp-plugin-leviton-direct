@@ -11,8 +11,16 @@ PYTHON_LIB_DIR = Path(__file__).resolve().parents[1] / "python_libs"
 if PYTHON_LIB_DIR.exists():
     sys.path.insert(0, str(PYTHON_LIB_DIR))
 
-from decora_wifi import DecoraWiFiSession  # type: ignore
-from decora_wifi.models.iot_switch import IotSwitch  # type: ignore
+try:
+    from decora_wifi import DecoraWiFiSession  # type: ignore
+    from decora_wifi.models.iot_switch import IotSwitch  # type: ignore
+except ModuleNotFoundError:
+    print(
+        "Missing Python dependency 'decora_wifi'. "
+        "Run the plugin install script or install manually: "
+        "python3 -m pip install --target /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_libs decora-wifi"
+    )
+    raise SystemExit(5)
 
 
 def read_plugin_config(path: Path) -> dict:
