@@ -111,6 +111,12 @@ def _api_get(session: DecoraWiFiSession, path: str):
     return session.call_api(path, {}, "get")
 
 
+def _norm_id(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -> list:
     switches = []
 
@@ -123,25 +129,54 @@ def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -
                 try:
                     pdata = getattr(perm, "data", {}) or {}
                     perm_id = getattr(perm, "_id", None) or pdata.get("id")
+                    perm_id = _norm_id(perm_id)
                     diagnostics.append(
                         f"permission keys={sorted(list(pdata.keys()))}, permId={perm_id}"
                     )
 
-                    residence_id = (
-                        pdata.get("residenceId")
-                        or pdata.get("residence_id")
-                        or pdata.get("ResidenceId")
-                        or pdata.get("residence", {}).get("id")
-                    )
+                    residence_raw = pdata.get("residenceId", None)
+                    diagnostics.append(f"permission residenceId raw={repr(residence_raw)}")
+
+                    residence_id = _norm_id(residence_raw)
+                    if not residence_id:
+                        residence_id = _norm_id(pdata.get("residence_id", None))
+                    if not residence_id:
+                        residence_id = _norm_id(pdata.get("ResidenceId", None))
+                    if not residence_id and isinstance(pdata.get("residence", None), dict):
+                        residence_id = _norm_id(pdata.get("residence", {}).get("id", None))
 
                     # If no residence id in permission payload, call raw permission->residence endpoint.
                     if not residence_id and perm_id:
                         rdata = _api_get(session, f"/ResidentialPermissions/{perm_id}/residence") or {}
+                        diagnostics.append(
+                            "permission->residence payload keys="
+                            + (str(sorted(list(rdata.keys()))) if isinstance(rdata, dict) else f"type={type(rdata).__name__}")
+                        )
                         if isinstance(rdata, dict):
                             residence_id = (
-                                rdata.get("id")
-                                or rdata.get("residenceId")
-                                or rdata.get("residence", {}).get("id")
+                                _norm_id(rdata.get("id"))
+                                or _norm_id(rdata.get("residenceId"))
+                                or _norm_id((rdata.get("residence", {}) or {}).get("id"))
+                            )
+                        else:
+                            residence_id = _norm_id(rdata)
+
+                    # Some accounts only allow permission-scoped switch listing.
+                    if perm_id:
+                        try:
+                            pfound = _api_get(session, f"/ResidentialPermissions/{perm_id}/residence/iotSwitches") or []
+                            diagnostics.append(
+                                f"/ResidentialPermissions/{perm_id}/residence/iotSwitches returned {len(pfound) if isinstance(pfound, list) else 0} switch(es)"
+                            )
+                            if isinstance(pfound, list):
+                                for item in pfound:
+                                    if isinstance(item, dict):
+                                        switches.append(item)
+                                    else:
+                                        switches.append(getattr(item, "data", {}) or {})
+                        except Exception as exc:
+                            diagnostics.append(
+                                f"/ResidentialPermissions/{perm_id}/residence/iotSwitches failed: {exc}"
                             )
 
                     if not residence_id:
