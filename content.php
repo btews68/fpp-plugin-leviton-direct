@@ -27,6 +27,18 @@ $pluginName = 'fpp-plugin-leviton-direct';
   </div>
 
   <div class='row mb-2'>
+    <div class='col-md-4'><label for='deviceProfile'><b>Device Profile</b></label></div>
+    <div class='col-md-8'>
+      <select id='deviceProfile' class='form-control'>
+        <option value='custom'>Custom (manual payloads)</option>
+        <option value='default'>Default Leviton (status)</option>
+        <option value='d26hd'>Leviton D26HD Dimmer (power)</option>
+      </select>
+      <small class='form-text text-muted'>Selecting a profile auto-fills Level Key and On/Off payloads.</small>
+    </div>
+  </div>
+
+  <div class='row mb-2'>
     <div class='col-md-4'><label for='onPayload'><b>On Payload JSON</b></label></div>
     <div class='col-md-8'><textarea id='onPayload' class='form-control' rows='3' placeholder='{"status":"on"}'></textarea></div>
   </div>
@@ -71,6 +83,19 @@ $pluginName = 'fpp-plugin-leviton-direct';
     LEVITON_DEVICE_NOTES: 'deviceNotes'
   };
 
+  const profiles = {
+    default: {
+      levelKey: 'brightness',
+      onPayload: '{"status":"on"}',
+      offPayload: '{"status":"off"}'
+    },
+    d26hd: {
+      levelKey: 'brightness',
+      onPayload: '{"power":"ON"}',
+      offPayload: '{"power":"OFF"}'
+    }
+  };
+
   function showStatus(obj) {
     document.getElementById('statusOutput').textContent =
       typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
@@ -100,6 +125,42 @@ $pluginName = 'fpp-plugin-leviton-direct';
         showStatus(`Failed to load ${key}: ${err}`);
       }
     }
+
+    inferProfileSelection();
+  }
+
+  function inferProfileSelection() {
+    const levelKey = document.getElementById('levelKey').value.trim();
+    const onPayload = document.getElementById('onPayload').value.trim();
+    const offPayload = document.getElementById('offPayload').value.trim();
+    const select = document.getElementById('deviceProfile');
+
+    if (levelKey === profiles.d26hd.levelKey && onPayload === profiles.d26hd.onPayload && offPayload === profiles.d26hd.offPayload) {
+      select.value = 'd26hd';
+      return;
+    }
+
+    if (levelKey === profiles.default.levelKey && onPayload === profiles.default.onPayload && offPayload === profiles.default.offPayload) {
+      select.value = 'default';
+      return;
+    }
+
+    select.value = 'custom';
+  }
+
+  function applyProfile(profileName) {
+    if (profileName === 'custom') {
+      return;
+    }
+    const profile = profiles[profileName];
+    if (!profile) {
+      return;
+    }
+
+    document.getElementById('levelKey').value = profile.levelKey;
+    document.getElementById('onPayload').value = profile.onPayload;
+    document.getElementById('offPayload').value = profile.offPayload;
+    showStatus({ ok: true, message: `Applied profile: ${profileName}` });
   }
 
   async function saveSettings() {
@@ -158,6 +219,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
   document.getElementById('discoverBtn').addEventListener('click', discoverDevices);
   document.getElementById('testOnBtn').addEventListener('click', () => runAction('on'));
   document.getElementById('testOffBtn').addEventListener('click', () => runAction('off'));
+  document.getElementById('deviceProfile').addEventListener('change', (e) => applyProfile(e.target.value));
 
   loadSettings();
 })();
