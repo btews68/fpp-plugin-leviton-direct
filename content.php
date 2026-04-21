@@ -225,12 +225,65 @@ $pluginName = 'fpp-plugin-leviton-direct';
     showStatus({ ok: true, message: 'Settings saved', results });
   }
 
+  function guessProfileFromDeviceType(deviceType) {
+    const typeStr = (deviceType || '').toLowerCase().trim();
+    if (typeStr.includes('dw15p') || typeStr.includes('outlet')) {
+      return 'dw15p';
+    }
+    if (typeStr.includes('d26hd') || typeStr.includes('dimmer')) {
+      return 'd26hd';
+    }
+    return 'default';
+  }
+
+  function selectDevice(deviceId, deviceName, profileName) {
+    document.getElementById('defaultSwitch').value = deviceId;
+    applyProfile(profileName);
+    showStatus({ ok: true, message: `Selected device: ${deviceName} (ID: ${deviceId}), applied profile: ${profileName}` });
+  }
+
   async function discoverDevices() {
     showStatus('Discovering devices...');
     const resp = await fetch(`api/plugin/${plugin}/devices`);
     const data = await resp.json();
-    document.getElementById('devicesOutput').textContent = JSON.stringify(data, null, 2);
-    showStatus(data.ok === false ? data : { ok: true, count: data.count || 0 });
+    
+    if (data.ok === false) {
+      document.getElementById('devicesOutput').textContent = JSON.stringify(data, null, 2);
+      showStatus(data);
+      return;
+    }
+
+    const devices = data.devices || [];
+    if (devices.length === 0) {
+      document.getElementById('devicesOutput').textContent = 'No devices discovered.';
+      showStatus({ ok: true, message: 'No devices found.' });
+      return;
+    }
+
+    // Build HTML table
+    let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
+    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Type</th><th style="text-align:center;padding:8px;">Action</th></tr>';
+    
+    devices.forEach((device, index) => {
+      const guessedProfile = guessProfileFromDeviceType(device.deviceType);
+      const profileLabel = guessedProfile === 'dw15p' ? 'DW15P' : guessedProfile === 'd26hd' ? 'D26HD' : 'Default';
+      const deviceId = device.id || '?';
+      const deviceName = device.name || `Device ${index + 1}`;
+      const deviceType = device.deviceType || 'unknown';
+      
+      html += `<tr style="border-bottom:1px solid #333;">`;
+      html += `<td style="padding:8px;">${deviceName}</td>`;
+      html += `<td style="padding:8px;"><code>${deviceId}</code></td>`;
+      html += `<td style="padding:8px;">${deviceType}</td>`;
+      html += `<td style="padding:8px; text-align:center;">`;
+      html += `<button class="buttons btn-outline-primary" style="padding:4px 8px; font-size:12px;" onclick="selectDevice('${deviceId}', '${deviceName.replace(/'/g, "\\'")}', '${guessedProfile}')">Select (${profileLabel})</button>`;
+      html += `</td>`;
+      html += `</tr>`;
+    });
+    
+    html += '</table>';
+    document.getElementById('devicesOutput').innerHTML = html;
+    showStatus({ ok: true, count: devices.length, message: `Discovered ${devices.length} device(s)` });
   }
 
   async function runAction(action, value = null) {
