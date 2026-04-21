@@ -8,6 +8,8 @@ PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY_LIB_DIR="$PLUGIN_DIR/python_libs"
 RUN_USER="$(id -un)"
 RUN_GROUP="$(id -gn)"
+FPP_MEDIA_DIR="${MEDIADIR:-${MEDIA_DIR:-/home/fpp/media}}"
+FPP_SCRIPTS_DIR="$FPP_MEDIA_DIR/scripts"
 
 mkdir -p "$PY_LIB_DIR"
 
@@ -60,5 +62,11 @@ chmod +x "$PLUGIN_DIR/commands/leviton_control.py"
 chmod +x "$PLUGIN_DIR/commands/leviton_on.sh"
 chmod +x "$PLUGIN_DIR/commands/leviton_off.sh"
 chmod +x "$PLUGIN_DIR/commands/leviton_dim.sh"
+
+# Link helper scripts into FPP's scripts directory so they appear in Script dropdowns.
+mkdir -p "$FPP_SCRIPTS_DIR"
+ln -sf "$PLUGIN_DIR/commands/leviton_on.sh" "$FPP_SCRIPTS_DIR/leviton_on.sh"
+ln -sf "$PLUGIN_DIR/commands/leviton_off.sh" "$FPP_SCRIPTS_DIR/leviton_off.sh"
+ln -sf "$PLUGIN_DIR/commands/leviton_dim.sh" "$FPP_SCRIPTS_DIR/leviton_dim.sh"
 
 echo "Installed fpp-plugin-leviton-direct"
