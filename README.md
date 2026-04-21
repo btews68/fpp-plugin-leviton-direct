@@ -10,15 +10,18 @@ Maintained by Holiday Pixel Zone: https://holidaypixelzone.com
 - Script: `commands/leviton_action.sh`
 - Backend: `commands/leviton_control.py` using `decora-wifi`
 - Plugin UI Configuration page to manage credentials/device settings
-- Device discovery button in UI
+- Device discovery table with model detection and profile auto-mapping
+- Friendly-name alias mapping (name -> device ID)
+- Playlist helper scripts: `leviton_on.sh`, `leviton_off.sh`, `leviton_dim.sh`
 
 ## Install
 
-1. Put this plugin in a git repo and update URLs in `pluginInfo.json`.
-2. Install from FPP Plugins UI using that repo's `pluginInfo.json`.
-3. Configure the plugin from UI:
+1. Install from FPP Plugins UI using this repo's `pluginInfo.json`.
+2. Configure the plugin from UI:
 
 - Plugin -> Leviton Direct Control -> Configuration
+
+3. Click `Discover Devices` and optionally save Friendly Name aliases.
 
 You can also set values manually in:
 
@@ -57,12 +60,29 @@ commands/leviton_action.sh abc123 raw '{"status":"on"}'
 commands/leviton_action.sh --list
 ```
 
+You can also target by alias or discovered device name/model when cached:
+
+```bash
+commands/leviton_action.sh Dining on
+commands/leviton_action.sh "Tesla Sign" off
+```
+
+## Playlist helper scripts
+
+These are linked into `/home/fpp/media/scripts` by install, so they appear in FPP Script dropdowns.
+
+```bash
+leviton_on.sh [alias_or_id]
+leviton_off.sh [alias_or_id]
+leviton_dim.sh <0-100> [alias_or_id]
+```
+
 ## Notes
 
 - Payload fields can vary by Leviton model/firmware.
 - If `status` or `brightness` does not work for your device, use `raw` action.
 - For dimming, use `LEVITON_LEVEL_PAYLOAD` with `__LEVEL__` token (for example `{"power":"ON","brightness":"__LEVEL__"}`).
-- You can discover switch IDs by temporarily using your bridge app (`/api/switches`) or by adding your own listing script.
+- Device profile dropdown includes built-in profiles and discovered-model auto profiles.
 
 ## Troubleshooting
 
@@ -76,6 +96,12 @@ If that still fails, install manually:
 
 ```bash
 python3 -m pip install --target /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_libs decora-wifi
+```
+
+If you update by `git pull` (instead of reinstalling from Plugin Manager), run install script again so script links and permissions are refreshed:
+
+```bash
+bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/scripts/fpp_install.sh
 ```
 
 If you see `Permission denied` under `python_libs`, fix ownership first:

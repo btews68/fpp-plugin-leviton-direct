@@ -4,7 +4,7 @@
   <li><b>Username / Email</b>: your myLeviton login</li>
   <li><b>Password</b>: your myLeviton password</li>
   <li><b>Default Switch ID</b>: optional switch used when command does not include a switch ID</li>
-  <li><b>Device Profile</b>: quick payload presets (Default Leviton or D26HD)</li>
+  <li><b>Device Profile</b>: quick payload presets plus auto-generated discovered-model profiles</li>
   <li><b>Level Key</b>: payload key used for dim/level updates (default: brightness)</li>
   <li><b>On/Off Payload JSON</b>: model-specific payload mapping</li>
   <li><b>Level Payload JSON</b>: optional JSON template for level action, supports <code>__LEVEL__</code> token</li>
