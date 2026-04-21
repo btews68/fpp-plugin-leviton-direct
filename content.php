@@ -17,6 +17,16 @@ $pluginName = 'fpp-plugin-leviton-direct';
   </div>
 
   <div class='row mb-2'>
+    <div class='col-md-4'><label for='quickSelectDevice'><b>Quick Select Device</b></label></div>
+    <div class='col-md-8'>
+      <select id='quickSelectDevice' class='form-control'>
+        <option value=''>-- Discover Devices first --</option>
+      </select>
+      <small class='form-text text-muted'>After discovery, select a device to auto-fill Default Switch ID and apply matching profile.</small>
+    </div>
+  </div>
+
+  <div class='row mb-2'>
     <div class='col-md-4'><label for='defaultSwitch'><b>Default Switch ID</b></label></div>
     <div class='col-md-8'><input id='defaultSwitch' class='form-control' type='text' placeholder='Optional: used when no switch ID is passed to command'></div>
   </div>
@@ -83,6 +93,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
 <script>
 (function () {
   const plugin = '<?php echo $pluginName; ?>';
+  let discoveredDevices = [];
 
   const fields = {
     LEVITON_EMAIL: 'levitonEmail',
@@ -236,10 +247,28 @@ $pluginName = 'fpp-plugin-leviton-direct';
     return 'default';
   }
 
-  function selectDevice(deviceId, deviceName, profileName) {
+  function selectDeviceFromDropdown(deviceId) {
+    if (!deviceId) return;
+    const device = discoveredDevices.find(d => d.id === deviceId);
+    if (!device) return;
+    const profileName = guessProfileFromDeviceType(device.deviceType);
     document.getElementById('defaultSwitch').value = deviceId;
     applyProfile(profileName);
-    showStatus({ ok: true, message: `Selected device: ${deviceName} (ID: ${deviceId}), applied profile: ${profileName}` });
+    showStatus({ ok: true, message: `Selected: ${device.name} (${device.model || device.deviceType})` });
+  }
+
+  function populateQuickSelectDropdown() {
+    const select = document.getElementById('quickSelectDevice');
+    select.innerHTML = '<option value="">-- No devices discovered --</option>';
+    
+    if (discoveredDevices.length === 0) return;
+    
+    discoveredDevices.forEach(device => {
+      const option = document.createElement('option');
+      option.value = device.id;
+      option.textContent = `${device.name} (${device.model || device.deviceType})`;
+      select.appendChild(option);
+    });
   }
 
   async function discoverDevices() {
@@ -254,35 +283,39 @@ $pluginName = 'fpp-plugin-leviton-direct';
     }
 
     const devices = data.devices || [];
+    discoveredDevices = devices;
+    
     if (devices.length === 0) {
       document.getElementById('devicesOutput').textContent = 'No devices discovered.';
       showStatus({ ok: true, message: 'No devices found.' });
+      populateQuickSelectDropdown();
       return;
     }
 
     // Build HTML table
     let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
-    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Type</th><th style="text-align:center;padding:8px;">Action</th></tr>';
+    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Model</th><th style="text-align:center;padding:8px;">Action</th></tr>';
     
     devices.forEach((device, index) => {
       const guessedProfile = guessProfileFromDeviceType(device.deviceType);
       const profileLabel = guessedProfile === 'dw15p' ? 'DW15P' : guessedProfile === 'd26hd' ? 'D26HD' : 'Default';
       const deviceId = device.id || '?';
       const deviceName = device.name || `Device ${index + 1}`;
-      const deviceType = device.deviceType || 'unknown';
+      const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType || 'unknown';
       
       html += `<tr style="border-bottom:1px solid #333;">`;
       html += `<td style="padding:8px;">${deviceName}</td>`;
       html += `<td style="padding:8px;"><code>${deviceId}</code></td>`;
-      html += `<td style="padding:8px;">${deviceType}</td>`;
+      html += `<td style="padding:8px;">${deviceModel}</td>`;
       html += `<td style="padding:8px; text-align:center;">`;
-      html += `<button class="buttons btn-outline-primary" style="padding:4px 8px; font-size:12px;" onclick="selectDevice('${deviceId}', '${deviceName.replace(/'/g, "\\'")}', '${guessedProfile}')">Select (${profileLabel})</button>`;
+      html += `<button class="buttons btn-outline-primary" style="padding:4px 8px; font-size:12px;" onclick="selectDeviceFromDropdown('${deviceId}')">Select (${profileLabel})</button>`;
       html += `</td>`;
       html += `</tr>`;
     });
     
     html += '</table>';
     document.getElementById('devicesOutput').innerHTML = html;
+    populateQuickSelectDropdown();
     showStatus({ ok: true, count: devices.length, message: `Discovered ${devices.length} device(s)` });
   }
 
@@ -320,6 +353,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     runAction('level', level);
   });
   document.getElementById('deviceProfile').addEventListener('change', (e) => applyProfile(e.target.value));
+  document.getElementById('quickSelectDevice').addEventListener('change', (e) => selectDeviceFromDropdown(e.target.value));
 
   loadSettings();
 })();
