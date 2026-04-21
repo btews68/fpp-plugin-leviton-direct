@@ -13,4 +13,10 @@
 <p>Use <b>Discover Devices</b> to pull current switch IDs from your account.</p>
 <p>Save aliases in <b>Friendly Name</b>, then run commands with alias instead of ID, for example:</p>
 <pre>bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/commands/leviton_action.sh Dining on</pre>
+<p>Playlist helper scripts are also available:</p>
+<ul>
+  <li><code>bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/commands/leviton_on.sh [alias_or_id]</code></li>
+  <li><code>bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/commands/leviton_off.sh [alias_or_id]</code></li>
+  <li><code>bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/commands/leviton_dim.sh &lt;0-100&gt; [alias_or_id]</code></li>
+</ul>
 <p>Use <b>Test LEVEL</b> with a 0-100 value to verify dimming behavior directly from the UI.</p>

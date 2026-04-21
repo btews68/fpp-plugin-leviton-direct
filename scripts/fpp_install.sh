@@ -57,5 +57,8 @@ fi
 
 chmod +x "$PLUGIN_DIR/commands/leviton_action.sh"
 chmod +x "$PLUGIN_DIR/commands/leviton_control.py"
+chmod +x "$PLUGIN_DIR/commands/leviton_on.sh"
+chmod +x "$PLUGIN_DIR/commands/leviton_off.sh"
+chmod +x "$PLUGIN_DIR/commands/leviton_dim.sh"
 
 echo "Installed fpp-plugin-leviton-direct"
