@@ -2,6 +2,8 @@
 
 FPP script plugin that controls Leviton smart switches directly using myLeviton.
 
+Maintained by Holiday Pixel Zone: https://holidaypixelzone.com
+
 ## What this plugin provides
 
 - One FPP command: `Leviton Switch Action`
@@ -59,3 +61,7 @@ commands/leviton_action.sh --list
 - Payload fields can vary by Leviton model/firmware.
 - If `status` or `brightness` does not work for your device, use `raw` action.
 - You can discover switch IDs by temporarily using your bridge app (`/api/switches`) or by adding your own listing script.
+
+## License
+
+MIT License. See `LICENSE`.
