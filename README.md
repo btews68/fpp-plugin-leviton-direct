@@ -2,7 +2,7 @@
 
 FPP script plugin that controls Leviton smart switches directly using myLeviton.
 
-Maintained by Holiday Pixel Zone: https://holidaypixelzone.com
+Created and maintained by Bill Tews at Holiday Pixel Zone: https://holidaypixelzone.com
 
 ## What this plugin provides
 
