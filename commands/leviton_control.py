@@ -121,16 +121,44 @@ def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -
             diagnostics.append(f"user.get_residential_permissions() returned {len(perms)} permission(s)")
             for perm in perms:
                 try:
-                    residence = perm.get_residence()
-                    residence_id = getattr(residence, "_id", None) or (residence.data or {}).get("id")
-                    if not residence_id:
-                        continue
-                    found = residence.get_iot_switches() or []
+                    pdata = getattr(perm, "data", {}) or {}
+                    perm_id = getattr(perm, "_id", None) or pdata.get("id")
                     diagnostics.append(
-                        f"permission->residence {residence_id} get_iot_switches() returned {len(found)} switch(es)"
+                        f"permission keys={sorted(list(pdata.keys()))}, permId={perm_id}"
                     )
-                    for item in found:
-                        switches.append(getattr(item, "data", {}) or {})
+
+                    residence_id = (
+                        pdata.get("residenceId")
+                        or pdata.get("residence_id")
+                        or pdata.get("ResidenceId")
+                        or pdata.get("residence", {}).get("id")
+                    )
+
+                    # If no residence id in permission payload, call raw permission->residence endpoint.
+                    if not residence_id and perm_id:
+                        rdata = _api_get(session, f"/ResidentialPermissions/{perm_id}/residence") or {}
+                        if isinstance(rdata, dict):
+                            residence_id = (
+                                rdata.get("id")
+                                or rdata.get("residenceId")
+                                or rdata.get("residence", {}).get("id")
+                            )
+
+                    if not residence_id:
+                        diagnostics.append("no residence_id found in permission payload")
+                        continue
+
+                    found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
+                    diagnostics.append(
+                        f"permission->residence {residence_id} /iotSwitches returned {len(found)} switch(es)"
+                    )
+
+                    if isinstance(found, list):
+                        for item in found:
+                            if isinstance(item, dict):
+                                switches.append(item)
+                            else:
+                                switches.append(getattr(item, "data", {}) or {})
                 except Exception as exc:
                     diagnostics.append(f"permission-based residence discovery failed: {exc}")
     except Exception as exc:
