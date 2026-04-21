@@ -8,11 +8,29 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ACTION_SCRIPT="$SCRIPT_DIR/leviton_action.sh"
 
 LEVEL="${1:-}"
-TARGET="${2:-}"
+TARGET=""
+
+# Some UIs may pass args as one string: "40 Tesla Sign"
+if [[ $# -eq 1 && "$LEVEL" == *" "* ]]; then
+  TARGET="${LEVEL#* }"
+  LEVEL="${LEVEL%% *}"
+else
+  TARGET="${*:2}"
+fi
+
+if [[ "$TARGET" =~ ^\".*\"$ || "$TARGET" =~ ^\'.*\'$ ]]; then
+  TARGET="${TARGET:1:-1}"
+fi
 
 if [[ -z "$LEVEL" ]]; then
   echo "Usage: $0 <level_0_to_100> [switch_id_or_alias]"
