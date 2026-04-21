@@ -3,9 +3,9 @@
   "name": "Leviton Direct Control",
   "author": "Bill Tews + GitHub Copilot",
   "description": "Direct myLeviton control commands for Falcon Player command presets and playlist actions.",
-  "homeURL": "https://github.com/your-org/fpp-plugin-leviton-direct",
-  "srcURL": "https://github.com/your-org/fpp-plugin-leviton-direct.git",
-  "bugURL": "https://github.com/your-org/fpp-plugin-leviton-direct/issues",
+  "homeURL": "https://github.com/btews68/fpp-plugin-leviton-direct",
+  "srcURL": "https://github.com/btews68/fpp-plugin-leviton-direct.git",
+  "bugURL": "https://github.com/btews68/fpp-plugin-leviton-direct/issues",
   "allowUpdates": 1,
   "versions": [
     {
