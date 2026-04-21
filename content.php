@@ -56,7 +56,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
         <option value='d26hd'>Leviton D26HD Dimmer (power)</option>
         <option value='dw15p'>Leviton DW15P Outlet (power)</option>
       </select>
-      <small class='form-text text-muted'>Selecting a profile auto-fills Level Key and On/Off payloads.</small>
+      <small class='form-text text-muted'>Selecting a profile auto-fills Level Key and On/Off payloads. Discovered models are added automatically as auto-mapped profiles.</small>
     </div>
   </div>
 
@@ -206,7 +206,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     if (profileName === 'custom') {
       return;
     }
-    const profile = profiles[profileName];
+
+    let resolvedProfileName = profileName;
+    if (String(profileName).startsWith('model:')) {
+      const modelName = String(profileName).slice('model:'.length);
+      resolvedProfileName = guessProfileFromModel(modelName);
+    }
+
+    const profile = profiles[resolvedProfileName];
     if (!profile) {
       return;
     }
@@ -216,7 +223,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     document.getElementById('offPayload').value = profile.offPayload;
     document.getElementById('levelPayload').value = profile.levelPayload;
     document.getElementById('deviceProfile').value = profileName;
-    showStatus({ ok: true, message: `Applied profile: ${profileName}` });
+    showStatus({ ok: true, message: `Applied profile: ${profileName} (${resolvedProfileName})` });
   }
 
   async function saveSettings() {
@@ -258,6 +265,40 @@ $pluginName = 'fpp-plugin-leviton-direct';
     return device?.raw?.modelType || device?.raw?.model || device?.deviceType || 'unknown';
   }
 
+  function getModelProfileOptionValue(modelName) {
+    return `model:${String(modelName || '').trim()}`;
+  }
+
+  function guessProfileFromModel(modelName) {
+    const modelStr = String(modelName || '').toLowerCase().trim();
+
+    if (!modelStr || modelStr === 'unknown') {
+      return 'default';
+    }
+
+    if (
+      modelStr.includes('d26hd') ||
+      modelStr.includes('d24') ||
+      modelStr.includes('dw6hd') ||
+      modelStr.includes('dimmer')
+    ) {
+      return 'd26hd';
+    }
+
+    if (
+      modelStr.includes('dw15p') ||
+      modelStr.includes('d215s') ||
+      modelStr.includes('d215p') ||
+      modelStr.includes('switch') ||
+      modelStr.includes('outlet') ||
+      modelStr.includes('plug')
+    ) {
+      return 'dw15p';
+    }
+
+    return 'default';
+  }
+
   function getSortedDevices(devices) {
     return [...(devices || [])].sort((a, b) => {
       const aName = String(a?.name || '').toLowerCase();
@@ -267,14 +308,42 @@ $pluginName = 'fpp-plugin-leviton-direct';
   }
 
   function guessProfileFromDevice(device) {
-    const modelStr = String(getDeviceModel(device)).toLowerCase().trim();
-    if (modelStr.includes('dw15p') || modelStr.includes('outlet')) {
-      return 'dw15p';
+    return guessProfileFromModel(getDeviceModel(device));
+  }
+
+  function syncModelProfilesInDropdown() {
+    const select = document.getElementById('deviceProfile');
+    if (!select) {
+      return;
     }
-    if (modelStr.includes('d26hd') || modelStr.includes('dimmer')) {
-      return 'd26hd';
+
+    const oldGroups = select.querySelectorAll('optgroup[data-model-profile-group="1"]');
+    oldGroups.forEach(group => group.remove());
+
+    const models = [...new Set(
+      (discoveredDevices || [])
+        .map(d => String(getDeviceModel(d) || '').trim())
+        .filter(m => m && m.toLowerCase() !== 'unknown')
+    )].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    if (models.length === 0) {
+      return;
     }
-    return 'default';
+
+    const group = document.createElement('optgroup');
+    group.label = 'Discovered Models (Auto)';
+    group.setAttribute('data-model-profile-group', '1');
+
+    models.forEach(modelName => {
+      const mappedBase = guessProfileFromModel(modelName);
+      const mappedLabel = mappedBase === 'd26hd' ? 'Dimmer' : mappedBase === 'dw15p' ? 'Switch/Outlet' : 'Default';
+      const option = document.createElement('option');
+      option.value = getModelProfileOptionValue(modelName);
+      option.textContent = `${modelName} (auto: ${mappedLabel})`;
+      group.appendChild(option);
+    });
+
+    select.appendChild(group);
   }
 
   function renderAliases() {
@@ -404,12 +473,15 @@ $pluginName = 'fpp-plugin-leviton-direct';
     }
     const profileName = guessProfileFromDevice(device);
     const deviceModel = getDeviceModel(device);
+    const modelProfileOptionValue = getModelProfileOptionValue(deviceModel);
     document.getElementById('defaultSwitch').value = selectedId;
     document.getElementById('quickSelectDevice').value = selectedId;
     if (!document.getElementById('aliasName').value.trim()) {
       document.getElementById('aliasName').value = String(device.name || '').trim();
     }
-    applyProfile(profileName);
+    const hasModelOption = Array.from(document.getElementById('deviceProfile').options)
+      .some(opt => opt.value === modelProfileOptionValue);
+    applyProfile(hasModelOption ? modelProfileOptionValue : profileName);
     showStatus({ ok: true, message: `Selected: ${device.name} (${deviceModel})` });
   }
 
@@ -435,6 +507,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     if (!Array.isArray(devices) || devices.length === 0) {
       document.getElementById('devicesOutput').innerHTML = 'No devices discovered.';
       populateQuickSelectDropdown();
+      syncModelProfilesInDropdown();
       return;
     }
 
@@ -463,6 +536,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     html += '</table>';
     document.getElementById('devicesOutput').innerHTML = html;
     populateQuickSelectDropdown();
+    syncModelProfilesInDropdown();
   }
 
   async function saveDiscoveredDevices(devices) {
