@@ -27,6 +27,17 @@ $pluginName = 'fpp-plugin-leviton-direct';
   </div>
 
   <div class='row mb-2'>
+    <div class='col-md-4'><label for='aliasName'><b>Friendly Name</b></label></div>
+    <div class='col-md-8'>
+      <div style='display: flex; gap: 8px;'>
+        <input id='aliasName' class='form-control' type='text' placeholder='Example: Dining, Porch, Window_Left'>
+        <button id='saveAliasBtn' class='buttons btn-outline-primary' type='button'>Save Alias</button>
+      </div>
+      <small class='form-text text-muted'>Use this name in scripts/commands instead of device ID.</small>
+    </div>
+  </div>
+
+  <div class='row mb-2'>
     <div class='col-md-4'><label for='defaultSwitch'><b>Default Switch ID</b></label></div>
     <div class='col-md-8'><input id='defaultSwitch' class='form-control' type='text' placeholder='Optional: used when no switch ID is passed to command'></div>
   </div>
@@ -86,6 +97,9 @@ $pluginName = 'fpp-plugin-leviton-direct';
   <h3>Discovered Devices</h3>
   <div id='devicesOutput' style='min-height: 180px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>No device data yet.</div>
 
+  <h3>Saved Friendly Names</h3>
+  <div id='aliasesOutput' style='min-height: 80px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>No aliases saved.</div>
+
   <h3>Status</h3>
   <pre id='statusOutput' style='min-height: 80px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>Ready.</pre>
 </div>
@@ -95,6 +109,8 @@ $pluginName = 'fpp-plugin-leviton-direct';
   const plugin = '<?php echo $pluginName; ?>';
   let discoveredDevices = [];
   const discoveredDevicesSettingKey = 'LEVITON_DISCOVERED_DEVICES';
+  const aliasesSettingKey = 'LEVITON_DEVICE_ALIASES';
+  let deviceAliases = {};
 
   const fields = {
     LEVITON_EMAIL: 'levitonEmail',
@@ -261,6 +277,121 @@ $pluginName = 'fpp-plugin-leviton-direct';
     return 'default';
   }
 
+  function renderAliases() {
+    const container = document.getElementById('aliasesOutput');
+    const aliasEntries = Object.entries(deviceAliases || {});
+    if (aliasEntries.length === 0) {
+      container.innerHTML = 'No aliases saved.';
+      return;
+    }
+
+    aliasEntries.sort((a, b) => a[0].toLowerCase().localeCompare(b[0].toLowerCase()));
+
+    let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
+    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Friendly Name</th><th style="text-align:left;padding:8px;">Device ID</th><th style="text-align:left;padding:8px;">Device Name</th><th style="text-align:left;padding:8px;">Profile</th><th style="text-align:center;padding:8px;">Action</th></tr>';
+
+    aliasEntries.forEach(([alias, data]) => {
+      const deviceId = String(data?.id || '');
+      const deviceName = String(data?.name || '');
+      const profile = String(data?.profile || 'default');
+      html += `<tr style="border-bottom:1px solid #333;">`;
+      html += `<td style="padding:8px;">${alias}</td>`;
+      html += `<td style="padding:8px;"><code>${deviceId}</code></td>`;
+      html += `<td style="padding:8px;">${deviceName}</td>`;
+      html += `<td style="padding:8px;">${profile}</td>`;
+      html += `<td style="padding:8px; text-align:center;">`;
+      html += `<button class="buttons btn-outline-secondary" style="padding:4px 8px; font-size:12px; margin-right:6px;" onclick="selectAlias('${alias.replace(/'/g, "\\'")}')">Use</button>`;
+      html += `<button class="buttons btn-outline-danger" style="padding:4px 8px; font-size:12px;" onclick="removeAlias('${alias.replace(/'/g, "\\'")}')">Delete</button>`;
+      html += `</td>`;
+      html += `</tr>`;
+    });
+
+    html += '</table>';
+    container.innerHTML = html;
+  }
+
+  async function saveAliasesToSettings() {
+    await setSetting(aliasesSettingKey, JSON.stringify(deviceAliases));
+  }
+
+  async function loadAliasesFromSettings() {
+    try {
+      const raw = await getSetting(aliasesSettingKey);
+      if (!raw) {
+        deviceAliases = {};
+        renderAliases();
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      deviceAliases = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+      renderAliases();
+    } catch (err) {
+      deviceAliases = {};
+      renderAliases();
+      showStatus(`Warning: unable to load aliases: ${err}`);
+    }
+  }
+
+  async function saveAliasFromSelection() {
+    const alias = document.getElementById('aliasName').value.trim();
+    const selectedId = document.getElementById('quickSelectDevice').value.trim();
+    if (!alias) {
+      showStatus('Enter a Friendly Name first.');
+      return;
+    }
+    if (!selectedId) {
+      showStatus('Select a device first.');
+      return;
+    }
+
+    const device = discoveredDevices.find(d => String(d.id || '').trim() === selectedId);
+    if (!device) {
+      showStatus('Selected device was not found in discovered list. Click Discover Devices again.');
+      return;
+    }
+
+    const profile = guessProfileFromDevice(device);
+    deviceAliases[alias] = {
+      id: selectedId,
+      name: String(device.name || ''),
+      model: getDeviceModel(device),
+      profile: profile,
+    };
+
+    await saveAliasesToSettings();
+    renderAliases();
+    showStatus({ ok: true, message: `Saved alias '${alias}' -> ${selectedId}` });
+  }
+
+  async function removeAlias(alias) {
+    if (!deviceAliases[alias]) {
+      return;
+    }
+    delete deviceAliases[alias];
+    await saveAliasesToSettings();
+    renderAliases();
+    showStatus({ ok: true, message: `Deleted alias '${alias}'.` });
+  }
+
+  function selectAlias(alias) {
+    const data = deviceAliases[alias];
+    if (!data || !data.id) {
+      showStatus({ ok: false, message: `Alias '${alias}' is missing device ID.` });
+      return;
+    }
+
+    const selectedId = String(data.id).trim();
+    document.getElementById('defaultSwitch').value = selectedId;
+    document.getElementById('quickSelectDevice').value = selectedId;
+    if (data.profile) {
+      applyProfile(String(data.profile));
+    }
+    showStatus({ ok: true, message: `Using alias '${alias}' (${selectedId}).` });
+  }
+
+  window.selectAlias = selectAlias;
+  window.removeAlias = removeAlias;
+
   function selectDeviceFromDropdown(deviceId) {
     const selectedId = String(deviceId || '').trim();
     if (!selectedId) {
@@ -275,6 +406,9 @@ $pluginName = 'fpp-plugin-leviton-direct';
     const deviceModel = getDeviceModel(device);
     document.getElementById('defaultSwitch').value = selectedId;
     document.getElementById('quickSelectDevice').value = selectedId;
+    if (!document.getElementById('aliasName').value.trim()) {
+      document.getElementById('aliasName').value = String(device.name || '').trim();
+    }
     applyProfile(profileName);
     showStatus({ ok: true, message: `Selected: ${device.name} (${deviceModel})` });
   }
@@ -417,7 +551,13 @@ $pluginName = 'fpp-plugin-leviton-direct';
     });
   }
 
+  const saveAliasBtn = document.getElementById('saveAliasBtn');
+  if (saveAliasBtn) {
+    saveAliasBtn.addEventListener('click', saveAliasFromSelection);
+  }
+
   loadSettings();
   loadDiscoveredDevicesFromCache();
+  loadAliasesFromSettings();
 })();
 </script>

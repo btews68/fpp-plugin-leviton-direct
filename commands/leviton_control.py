@@ -55,6 +55,43 @@ def parse_json_setting(cfg: dict, key: str, default: dict) -> dict:
     return parsed
 
 
+def _extract_alias_target(value) -> str:
+    if isinstance(value, dict):
+        return _norm_id(value.get("id") or value.get("switchId"))
+    return _norm_id(value)
+
+
+def resolve_switch_id(requested: str, default_switch_id: str, aliases: dict) -> tuple[str, str]:
+    """
+    Resolve a switch target by explicit ID/alias, then fallback to default ID/alias.
+    Returns (resolved_switch_id, alias_used).
+    """
+    requested = _norm_id(requested)
+    default_switch_id = _norm_id(default_switch_id)
+
+    candidate = requested or default_switch_id
+    if not candidate:
+        return "", ""
+
+    if isinstance(aliases, dict):
+        # Exact alias key match first.
+        if candidate in aliases:
+            target = _extract_alias_target(aliases.get(candidate))
+            if target:
+                return target, candidate
+
+        # Case-insensitive alias match.
+        lowered = candidate.lower()
+        for alias_name, alias_value in aliases.items():
+            if str(alias_name).lower() != lowered:
+                continue
+            target = _extract_alias_target(alias_value)
+            if target:
+                return target, str(alias_name)
+
+    return candidate, ""
+
+
 def build_level_payload(level: int, level_key: str, template: dict) -> dict:
     # If template is provided, replace __LEVEL__ token recursively.
     def _replace_tokens(value):
@@ -336,6 +373,7 @@ def main() -> int:
     on_payload = parse_json_setting(cfg, "LEVITON_ON_PAYLOAD", {"status": "on"})
     off_payload = parse_json_setting(cfg, "LEVITON_OFF_PAYLOAD", {"status": "off"})
     level_payload_template = parse_json_setting(cfg, "LEVITON_LEVEL_PAYLOAD", {})
+    device_aliases = parse_json_setting(cfg, "LEVITON_DEVICE_ALIASES", {})
 
     if not email or not password:
         die(
@@ -353,7 +391,8 @@ def main() -> int:
     if len(sys.argv) < 3:
         die("Usage: leviton_control.py <switch_id> <on|off|level|raw> [value]", 2)
 
-    switch_id = sys.argv[1].strip() or default_switch_id
+    requested_switch = sys.argv[1].strip()
+    switch_id, alias_used = resolve_switch_id(requested_switch, default_switch_id, device_aliases)
     action = sys.argv[2].strip().lower()
     value = sys.argv[3] if len(sys.argv) > 3 else ""
 
@@ -404,7 +443,9 @@ def main() -> int:
         json.dumps(
             {
                 "ok": True,
+                "requestedSwitch": requested_switch or default_switch_id,
                 "switchId": switch_id,
+                "aliasUsed": alias_used,
                 "deviceClass": device_class,
                 "action": action,
                 "payload": payload,

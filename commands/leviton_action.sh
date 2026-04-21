@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage:
-#   leviton_action.sh <switch_id> <on|off|level|raw> [value]
+#   leviton_action.sh <switch_id_or_alias> <on|off|level|raw> [value]
 #   leviton_action.sh <on|off|level|raw> [value]
 #   leviton_action.sh --list
 #
@@ -11,6 +11,7 @@
 #   LEVITON_PASSWORD = yourpassword
 #   LEVITON_LEVEL_KEY = brightness
 #   LEVITON_DEFAULT_SWITCH_ID = your-switch-id
+#   LEVITON_DEVICE_ALIASES = {"Dining":"1758471"}
 #   LEVITON_ON_PAYLOAD = {"status":"on"}
 #   LEVITON_OFF_PAYLOAD = {"status":"off"}
 #
@@ -45,7 +46,7 @@ case "$ARG1" in
 esac
 
 if [[ -z "$ACTION" ]]; then
-  echo "Usage: $0 <switch_id> <on|off|level|raw> [value]"
+  echo "Usage: $0 <switch_id_or_alias> <on|off|level|raw> [value]"
   echo "   or: $0 <on|off|level|raw> [value]"
   echo "   or: $0 --list"
   exit 2

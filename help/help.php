@@ -8,6 +8,9 @@
   <li><b>Level Key</b>: payload key used for dim/level updates (default: brightness)</li>
   <li><b>On/Off Payload JSON</b>: model-specific payload mapping</li>
   <li><b>Level Payload JSON</b>: optional JSON template for level action, supports <code>__LEVEL__</code> token</li>
+  <li><b>Friendly Name</b>: map a readable name (like <code>Dining</code>) to a discovered device ID for scripts</li>
 </ul>
 <p>Use <b>Discover Devices</b> to pull current switch IDs from your account.</p>
+<p>Save aliases in <b>Friendly Name</b>, then run commands with alias instead of ID, for example:</p>
+<pre>bash /home/fpp/media/plugins/fpp-plugin-leviton-direct/commands/leviton_action.sh Dining on</pre>
 <p>Use <b>Test LEVEL</b> with a 0-100 value to verify dimming behavior directly from the UI.</p>
