@@ -252,10 +252,13 @@ $pluginName = 'fpp-plugin-leviton-direct';
     const device = discoveredDevices.find(d => d.id === deviceId);
     if (!device) return;
     const profileName = guessProfileFromDeviceType(device.deviceType);
+    const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType;
     document.getElementById('defaultSwitch').value = deviceId;
     applyProfile(profileName);
-    showStatus({ ok: true, message: `Selected: ${device.name} (${device.model || device.deviceType})` });
+    showStatus({ ok: true, message: `Selected: ${device.name} (${deviceModel})` });
   }
+
+  window.selectDeviceFromDropdown = selectDeviceFromDropdown;
 
   function populateQuickSelectDropdown() {
     const select = document.getElementById('quickSelectDevice');
