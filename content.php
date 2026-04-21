@@ -242,6 +242,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     return device?.raw?.modelType || device?.raw?.model || device?.deviceType || 'unknown';
   }
 
+  function getSortedDevices(devices) {
+    return [...(devices || [])].sort((a, b) => {
+      const aName = String(a?.name || '').toLowerCase();
+      const bName = String(b?.name || '').toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }
+
   function guessProfileFromDevice(device) {
     const modelStr = String(getDeviceModel(device)).toLowerCase().trim();
     if (modelStr.includes('dw15p') || modelStr.includes('outlet')) {
@@ -278,8 +286,9 @@ $pluginName = 'fpp-plugin-leviton-direct';
     select.innerHTML = '<option value="">-- Select discovered device --</option>';
     
     if (discoveredDevices.length === 0) return;
-    
-    discoveredDevices.forEach(device => {
+
+    const sortedDevices = getSortedDevices(discoveredDevices);
+    sortedDevices.forEach(device => {
       const option = document.createElement('option');
       option.value = String(device.id || '');
       const deviceModel = getDeviceModel(device);
@@ -295,10 +304,12 @@ $pluginName = 'fpp-plugin-leviton-direct';
       return;
     }
 
+    const sortedDevices = getSortedDevices(devices);
+
     let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
     html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Model</th><th style="text-align:center;padding:8px;">Action</th></tr>';
 
-    devices.forEach((device, index) => {
+    sortedDevices.forEach((device, index) => {
       const guessedProfile = guessProfileFromDevice(device);
       const profileLabel = guessedProfile === 'dw15p' ? 'DW15P' : guessedProfile === 'd26hd' ? 'D26HD' : 'Default';
       const deviceId = String(device.id || '?');
