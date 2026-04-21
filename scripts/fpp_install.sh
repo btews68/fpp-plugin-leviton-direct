@@ -6,8 +6,30 @@
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY_LIB_DIR="$PLUGIN_DIR/python_libs"
+RUN_USER="$(id -un)"
+RUN_GROUP="$(id -gn)"
 
 mkdir -p "$PY_LIB_DIR"
+
+if ! touch "$PY_LIB_DIR/.fpp_write_test" >/dev/null 2>&1; then
+	echo "python_libs is not writable by $RUN_USER, attempting to fix ownership"
+	if [ -n "${SUDO:-}" ]; then
+		${SUDO} mkdir -p "$PY_LIB_DIR"
+		${SUDO} chown -R "$RUN_USER:$RUN_GROUP" "$PY_LIB_DIR"
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo mkdir -p "$PY_LIB_DIR"
+		sudo chown -R "$RUN_USER:$RUN_GROUP" "$PY_LIB_DIR"
+	else
+		echo "ERROR: Cannot fix permissions on $PY_LIB_DIR (sudo unavailable)."
+		exit 1
+	fi
+fi
+
+if ! touch "$PY_LIB_DIR/.fpp_write_test" >/dev/null 2>&1; then
+	echo "ERROR: $PY_LIB_DIR is still not writable by $RUN_USER after permission fix."
+	exit 1
+fi
+rm -f "$PY_LIB_DIR/.fpp_write_test"
 
 echo "Installing Python dependency: decora-wifi"
 

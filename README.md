@@ -76,6 +76,12 @@ If that still fails, install manually:
 python3 -m pip install --target /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_libs decora-wifi
 ```
 
+If you see `Permission denied` under `python_libs`, fix ownership first:
+
+```bash
+sudo chown -R fpp:fpp /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_libs
+```
+
 ## License
 
 MIT License. See `LICENSE`.
