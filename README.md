@@ -33,6 +33,7 @@ LEVITON_DEFAULT_SWITCH_ID = switch-id-here
 LEVITON_LEVEL_KEY = brightness
 LEVITON_ON_PAYLOAD = {"status":"on"}
 LEVITON_OFF_PAYLOAD = {"status":"off"}
+LEVITON_LEVEL_PAYLOAD = {"brightness":"__LEVEL__"}
 LEVITON_DEVICE_NOTES = Optional notes
 ```
 
@@ -60,6 +61,7 @@ commands/leviton_action.sh --list
 
 - Payload fields can vary by Leviton model/firmware.
 - If `status` or `brightness` does not work for your device, use `raw` action.
+- For dimming, use `LEVITON_LEVEL_PAYLOAD` with `__LEVEL__` token (for example `{"power":"ON","brightness":"__LEVEL__"}`).
 - You can discover switch IDs by temporarily using your bridge app (`/api/switches`) or by adding your own listing script.
 
 ## Troubleshooting

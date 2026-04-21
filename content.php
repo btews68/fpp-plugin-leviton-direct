@@ -48,6 +48,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     <div class='col-md-8'><textarea id='offPayload' class='form-control' rows='3' placeholder='{"status":"off"}'></textarea></div>
   </div>
 
+  <div class='row mb-2'>
+    <div class='col-md-4'><label for='levelPayload'><b>Level Payload JSON</b></label></div>
+    <div class='col-md-8'>
+      <textarea id='levelPayload' class='form-control' rows='3' placeholder='{"brightness":"__LEVEL__"}'></textarea>
+      <small class='form-text text-muted'>Use <b>__LEVEL__</b> token for the numeric dim level (0-100).</small>
+    </div>
+  </div>
+
   <div class='row mb-3'>
     <div class='col-md-4'><label for='deviceNotes'><b>Device Notes</b></label></div>
     <div class='col-md-8'><textarea id='deviceNotes' class='form-control' rows='3' placeholder='Optional notes: model quirks, payload info, etc.'></textarea></div>
@@ -80,6 +88,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     LEVITON_LEVEL_KEY: 'levelKey',
     LEVITON_ON_PAYLOAD: 'onPayload',
     LEVITON_OFF_PAYLOAD: 'offPayload',
+    LEVITON_LEVEL_PAYLOAD: 'levelPayload',
     LEVITON_DEVICE_NOTES: 'deviceNotes'
   };
 
@@ -87,12 +96,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     default: {
       levelKey: 'brightness',
       onPayload: '{"status":"on"}',
-      offPayload: '{"status":"off"}'
+      offPayload: '{"status":"off"}',
+      levelPayload: '{"brightness":"__LEVEL__"}'
     },
     d26hd: {
       levelKey: 'brightness',
       onPayload: '{"power":"ON"}',
-      offPayload: '{"power":"OFF"}'
+      offPayload: '{"power":"OFF"}',
+      levelPayload: '{"power":"ON","brightness":"__LEVEL__"}'
     }
   };
 
@@ -133,14 +144,15 @@ $pluginName = 'fpp-plugin-leviton-direct';
     const levelKey = document.getElementById('levelKey').value.trim();
     const onPayload = document.getElementById('onPayload').value.trim();
     const offPayload = document.getElementById('offPayload').value.trim();
+    const levelPayload = document.getElementById('levelPayload').value.trim();
     const select = document.getElementById('deviceProfile');
 
-    if (levelKey === profiles.d26hd.levelKey && onPayload === profiles.d26hd.onPayload && offPayload === profiles.d26hd.offPayload) {
+    if (levelKey === profiles.d26hd.levelKey && onPayload === profiles.d26hd.onPayload && offPayload === profiles.d26hd.offPayload && levelPayload === profiles.d26hd.levelPayload) {
       select.value = 'd26hd';
       return;
     }
 
-    if (levelKey === profiles.default.levelKey && onPayload === profiles.default.onPayload && offPayload === profiles.default.offPayload) {
+    if (levelKey === profiles.default.levelKey && onPayload === profiles.default.onPayload && offPayload === profiles.default.offPayload && levelPayload === profiles.default.levelPayload) {
       select.value = 'default';
       return;
     }
@@ -160,12 +172,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     document.getElementById('levelKey').value = profile.levelKey;
     document.getElementById('onPayload').value = profile.onPayload;
     document.getElementById('offPayload').value = profile.offPayload;
+    document.getElementById('levelPayload').value = profile.levelPayload;
     showStatus({ ok: true, message: `Applied profile: ${profileName}` });
   }
 
   async function saveSettings() {
     const onPayload = document.getElementById('onPayload').value.trim();
     const offPayload = document.getElementById('offPayload').value.trim();
+    const levelPayload = document.getElementById('levelPayload').value.trim();
 
     if (onPayload) {
       try { JSON.parse(onPayload); } catch (e) {
@@ -177,6 +191,13 @@ $pluginName = 'fpp-plugin-leviton-direct';
     if (offPayload) {
       try { JSON.parse(offPayload); } catch (e) {
         showStatus('Off Payload JSON is invalid: ' + e);
+        return;
+      }
+    }
+
+    if (levelPayload) {
+      try { JSON.parse(levelPayload); } catch (e) {
+        showStatus('Level Payload JSON is invalid: ' + e);
         return;
       }
     }

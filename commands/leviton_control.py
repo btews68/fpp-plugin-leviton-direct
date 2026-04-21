@@ -55,6 +55,25 @@ def parse_json_setting(cfg: dict, key: str, default: dict) -> dict:
     return parsed
 
 
+def build_level_payload(level: int, level_key: str, template: dict) -> dict:
+    # If template is provided, replace __LEVEL__ token recursively.
+    def _replace_tokens(value):
+        if isinstance(value, str):
+            if value == "__LEVEL__":
+                return level
+            return value.replace("__LEVEL__", str(level))
+        if isinstance(value, dict):
+            return {k: _replace_tokens(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_replace_tokens(v) for v in value]
+        return value
+
+    if template:
+        return _replace_tokens(template)
+
+    return {level_key: level}
+
+
 def list_switches(session: DecoraWiFiSession) -> int:
     diagnostics = []
 
@@ -316,6 +335,7 @@ def main() -> int:
     level_key = cfg.get("LEVITON_LEVEL_KEY", "brightness").strip() or "brightness"
     on_payload = parse_json_setting(cfg, "LEVITON_ON_PAYLOAD", {"status": "on"})
     off_payload = parse_json_setting(cfg, "LEVITON_OFF_PAYLOAD", {"status": "off"})
+    level_payload_template = parse_json_setting(cfg, "LEVITON_LEVEL_PAYLOAD", {})
 
     if not email or not password:
         die(
@@ -364,7 +384,7 @@ def main() -> int:
         except ValueError:
             die("For action=level, value must be an integer 0-100", 4)
         level = max(0, min(100, level))
-        payload = {level_key: level}
+        payload = build_level_payload(level, level_key, level_payload_template)
     elif action == "raw":
         if not value:
             die("For action=raw, value must be a JSON object", 4)
