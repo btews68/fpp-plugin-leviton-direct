@@ -14,6 +14,7 @@ if PYTHON_LIB_DIR.exists():
 try:
     from decora_wifi import DecoraWiFiSession, ApiCallFailedError  # type: ignore
     from decora_wifi.models.iot_switch import IotSwitch  # type: ignore
+    from decora_wifi.models.load import Load  # type: ignore
 except ModuleNotFoundError:
     print(
         "Missing Python dependency 'decora_wifi'. "
@@ -87,10 +88,12 @@ def list_switches(session: DecoraWiFiSession) -> int:
     result = []
     for device in devices:
         data = getattr(device, "data", {}) or {}
+        dtype = data.get("deviceType") or data.get("type") or data.get("modelType") or "unknown"
         result.append(
             {
                 "id": data.get("id", getattr(device, "_id", "")),
                 "name": data.get("name") or data.get("displayName") or data.get("serialNumber") or "",
+                "deviceType": dtype,
                 "roomId": data.get("residentialRoomId"),
                 "residenceId": data.get("residenceId"),
                 "raw": data,
@@ -119,6 +122,16 @@ def _norm_id(value) -> str:
 
 def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -> list:
     switches = []
+
+    def _add_items(found, source_label):
+        count = len(found) if isinstance(found, list) else 0
+        diagnostics.append(f"{source_label} returned {count} device(s)")
+        if isinstance(found, list):
+            for item in found:
+                if isinstance(item, dict):
+                    switches.append(item)
+                else:
+                    switches.append(getattr(item, "data", {}) or {})
 
     # Path A: logged-in user -> residential permissions -> residence -> iot switches
     try:
@@ -165,35 +178,57 @@ def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -
                     if perm_id:
                         try:
                             pfound = _api_get(session, f"/ResidentialPermissions/{perm_id}/residence/iotSwitches") or []
-                            diagnostics.append(
-                                f"/ResidentialPermissions/{perm_id}/residence/iotSwitches returned {len(pfound) if isinstance(pfound, list) else 0} switch(es)"
-                            )
-                            if isinstance(pfound, list):
-                                for item in pfound:
-                                    if isinstance(item, dict):
-                                        switches.append(item)
-                                    else:
-                                        switches.append(getattr(item, "data", {}) or {})
+                            _add_items(pfound, f"/ResidentialPermissions/{perm_id}/residence/iotSwitches")
                         except Exception as exc:
                             diagnostics.append(
                                 f"/ResidentialPermissions/{perm_id}/residence/iotSwitches failed: {exc}"
                             )
+                        try:
+                            ploads = _api_get(session, f"/ResidentialPermissions/{perm_id}/residence/loads") or []
+                            _add_items(ploads, f"/ResidentialPermissions/{perm_id}/residence/loads")
+                        except Exception as exc:
+                            diagnostics.append(
+                                f"/ResidentialPermissions/{perm_id}/residence/loads failed: {exc}"
+                            )
+
+                        # Some accounts block list endpoints but allow account-by-id endpoints.
+                        account_id = _norm_id(pdata.get("residentialAccountId"))
+                        if account_id:
+                            try:
+                                residences2 = _api_get(session, f"/ResidentialAccounts/{account_id}/residences") or []
+                                diagnostics.append(
+                                    f"/ResidentialAccounts/{account_id}/residences returned {len(residences2)} residence(s)"
+                                )
+                                for r in residences2:
+                                    rid = _norm_id(r.get("id"))
+                                    if not rid:
+                                        continue
+                                    try:
+                                        rsw = _api_get(session, f"/Residences/{rid}/iotSwitches") or []
+                                        _add_items(rsw, f"/Residences/{rid}/iotSwitches")
+                                    except Exception as exc:
+                                        diagnostics.append(f"/Residences/{rid}/iotSwitches failed: {exc}")
+                                    try:
+                                        rld = _api_get(session, f"/Residences/{rid}/loads") or []
+                                        _add_items(rld, f"/Residences/{rid}/loads")
+                                    except Exception as exc:
+                                        diagnostics.append(f"/Residences/{rid}/loads failed: {exc}")
+                            except Exception as exc:
+                                diagnostics.append(
+                                    f"/ResidentialAccounts/{account_id}/residences failed: {exc}"
+                                )
 
                     if not residence_id:
                         diagnostics.append("no residence_id found in permission payload")
                         continue
 
                     found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
-                    diagnostics.append(
-                        f"permission->residence {residence_id} /iotSwitches returned {len(found)} switch(es)"
-                    )
-
-                    if isinstance(found, list):
-                        for item in found:
-                            if isinstance(item, dict):
-                                switches.append(item)
-                            else:
-                                switches.append(getattr(item, "data", {}) or {})
+                    _add_items(found, f"permission->residence {residence_id} /iotSwitches")
+                    try:
+                        found_loads = _api_get(session, f"/Residences/{residence_id}/loads") or []
+                        _add_items(found_loads, f"permission->residence {residence_id} /loads")
+                    except Exception as exc:
+                        diagnostics.append(f"permission->residence {residence_id} /loads failed: {exc}")
                 except Exception as exc:
                     diagnostics.append(f"permission-based residence discovery failed: {exc}")
     except Exception as exc:
@@ -221,10 +256,12 @@ def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -
                 continue
             try:
                 found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
-                diagnostics.append(
-                    f"/Residences/{residence_id}/iotSwitches returned {len(found)} switch(es)"
-                )
-                switches.extend(found)
+                _add_items(found, f"/Residences/{residence_id}/iotSwitches")
+                try:
+                    found_loads = _api_get(session, f"/Residences/{residence_id}/loads") or []
+                    _add_items(found_loads, f"/Residences/{residence_id}/loads")
+                except Exception as exc:
+                    diagnostics.append(f"/Residences/{residence_id}/loads failed: {exc}")
             except Exception as exc:
                 diagnostics.append(f"/Residences/{residence_id}/iotSwitches failed: {exc}")
 
@@ -238,12 +275,22 @@ def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -
                 if not residence_id:
                     continue
                 found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
-                diagnostics.append(
-                    f"/Residences/{residence_id}/iotSwitches returned {len(found)} switch(es)"
-                )
-                switches.extend(found)
+                _add_items(found, f"/Residences/{residence_id}/iotSwitches")
+                try:
+                    found_loads = _api_get(session, f"/Residences/{residence_id}/loads") or []
+                    _add_items(found_loads, f"/Residences/{residence_id}/loads")
+                except Exception as exc:
+                    diagnostics.append(f"/Residences/{residence_id}/loads failed: {exc}")
         except Exception as exc:
             diagnostics.append(f"/Residences fallback failed: {exc}")
+
+    # Final generic fallback: list loads directly if permitted.
+    if not switches:
+        try:
+            direct_loads = _api_get(session, "/Loads") or []
+            _add_items(direct_loads, "/Loads")
+        except Exception as exc:
+            diagnostics.append(f"/Loads fallback failed: {exc}")
 
     # De-duplicate by id.
     seen = set()
@@ -293,8 +340,19 @@ def main() -> int:
     if not switch_id:
         die("No switch_id supplied and LEVITON_DEFAULT_SWITCH_ID is not set", 2)
 
-    device = IotSwitch(session, switch_id)
-    device.refresh()
+    device = None
+    device_class = None
+    try:
+        device = IotSwitch(session, switch_id)
+        device.refresh()
+        device_class = "IotSwitch"
+    except Exception:
+        try:
+            device = Load(session, switch_id)
+            device.refresh()
+            device_class = "Load"
+        except Exception as exc:
+            die(f"Unable to access device ID {switch_id} as IotSwitch or Load: {exc}", 4)
 
     if action == "on":
         payload = on_payload
@@ -322,7 +380,19 @@ def main() -> int:
     device.update_attributes(payload)
     device.refresh()
 
-    print(json.dumps({"ok": True, "switchId": switch_id, "action": action, "payload": payload, "result": device.data}, indent=2))
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "switchId": switch_id,
+                "deviceClass": device_class,
+                "action": action,
+                "payload": payload,
+                "result": device.data,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
