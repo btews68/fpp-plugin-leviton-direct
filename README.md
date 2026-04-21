@@ -112,4 +112,6 @@ sudo chown -R fpp:fpp /home/fpp/media/plugins/fpp-plugin-leviton-direct/python_l
 
 ## License
 
-MIT License. See `LICENSE`.
+PolyForm Noncommercial License 1.0.0. See `LICENSE`.
+
+Note: prior published releases may have been under MIT. This license applies to current and future releases unless stated otherwise.
