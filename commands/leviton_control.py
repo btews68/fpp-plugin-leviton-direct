@@ -12,7 +12,7 @@ if PYTHON_LIB_DIR.exists():
     sys.path.insert(0, str(PYTHON_LIB_DIR))
 
 try:
-    from decora_wifi import DecoraWiFiSession  # type: ignore
+    from decora_wifi import DecoraWiFiSession, ApiCallFailedError  # type: ignore
     from decora_wifi.models.iot_switch import IotSwitch  # type: ignore
 except ModuleNotFoundError:
     print(
@@ -55,10 +55,38 @@ def parse_json_setting(cfg: dict, key: str, default: dict) -> dict:
 
 
 def list_switches(session: DecoraWiFiSession) -> int:
-    devices = IotSwitch.find(session)
+    diagnostics = []
+
+    # Preferred path in decora-wifi, works on many accounts.
+    try:
+        devices = IotSwitch.find(session)
+        diagnostics.append("IotSwitch.find() success")
+    except Exception as exc:
+        diagnostics.append(f"IotSwitch.find() failed: {exc}")
+        devices = []
+
+    # Fallback path for accounts where /IotSwitches endpoint is unauthorized.
+    if not devices:
+        try:
+            discovered = _discover_switches_fallback(session, diagnostics)
+            devices = [_RawSwitch(d) for d in discovered]
+        except Exception as exc:
+            diagnostics.append(f"Fallback discovery failed: {exc}")
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "Unable to discover switches.",
+                        "details": diagnostics,
+                    },
+                    indent=2,
+                )
+            )
+            return 1
+
     result = []
     for device in devices:
-        data = device.data or {}
+        data = getattr(device, "data", {}) or {}
         result.append(
             {
                 "id": data.get("id", getattr(device, "_id", "")),
@@ -69,8 +97,79 @@ def list_switches(session: DecoraWiFiSession) -> int:
             }
         )
 
-    print(json.dumps({"ok": True, "count": len(result), "devices": result}, indent=2))
+    print(json.dumps({"ok": True, "count": len(result), "devices": result, "details": diagnostics}, indent=2))
     return 0
+
+
+class _RawSwitch:
+    def __init__(self, data: dict):
+        self.data = data
+        self._id = data.get("id", "")
+
+
+def _api_get(session: DecoraWiFiSession, path: str):
+    return session.call_api(path, {}, "get")
+
+
+def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -> list:
+    switches = []
+
+    # Try ResidentialAccounts -> residences -> iotSwitches
+    accounts = _api_get(session, "/ResidentialAccounts") or []
+    diagnostics.append(f"/ResidentialAccounts returned {len(accounts)} account(s)")
+
+    for account in accounts:
+        account_id = account.get("id")
+        if not account_id:
+            continue
+        residences = _api_get(session, f"/ResidentialAccounts/{account_id}/residences") or []
+        diagnostics.append(
+            f"/ResidentialAccounts/{account_id}/residences returned {len(residences)} residence(s)"
+        )
+        for residence in residences:
+            residence_id = residence.get("id")
+            if not residence_id:
+                continue
+            try:
+                found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
+                diagnostics.append(
+                    f"/Residences/{residence_id}/iotSwitches returned {len(found)} switch(es)"
+                )
+                switches.extend(found)
+            except Exception as exc:
+                diagnostics.append(f"/Residences/{residence_id}/iotSwitches failed: {exc}")
+
+    # Last-chance direct residence call.
+    if not switches:
+        try:
+            residences = _api_get(session, "/Residences") or []
+            diagnostics.append(f"/Residences returned {len(residences)} residence(s)")
+            for residence in residences:
+                residence_id = residence.get("id")
+                if not residence_id:
+                    continue
+                found = _api_get(session, f"/Residences/{residence_id}/iotSwitches") or []
+                diagnostics.append(
+                    f"/Residences/{residence_id}/iotSwitches returned {len(found)} switch(es)"
+                )
+                switches.extend(found)
+        except Exception as exc:
+            diagnostics.append(f"/Residences fallback failed: {exc}")
+
+    # De-duplicate by id.
+    seen = set()
+    deduped = []
+    for sw in switches:
+        sid = sw.get("id")
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        deduped.append(sw)
+
+    if not deduped:
+        raise ApiCallFailedError("No switches discovered via fallback endpoints")
+
+    return deduped
 
 
 def main() -> int:
