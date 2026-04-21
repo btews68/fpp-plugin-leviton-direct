@@ -84,7 +84,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
   </div>
 
   <h3>Discovered Devices</h3>
-  <pre id='devicesOutput' style='min-height: 180px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>No device data yet.</pre>
+  <div id='devicesOutput' style='min-height: 180px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>No device data yet.</div>
 
   <h3>Status</h3>
   <pre id='statusOutput' style='min-height: 80px; background: #111; color: #ddd; padding: 12px; border-radius: 6px;'>Ready.</pre>
@@ -94,6 +94,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
 (function () {
   const plugin = '<?php echo $pluginName; ?>';
   let discoveredDevices = [];
+  const discoveredDevicesSettingKey = 'LEVITON_DISCOVERED_DEVICES';
 
   const fields = {
     LEVITON_EMAIL: 'levitonEmail',
@@ -198,6 +199,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     document.getElementById('onPayload').value = profile.onPayload;
     document.getElementById('offPayload').value = profile.offPayload;
     document.getElementById('levelPayload').value = profile.levelPayload;
+    document.getElementById('deviceProfile').value = profileName;
     showStatus({ ok: true, message: `Applied profile: ${profileName}` });
   }
 
@@ -236,33 +238,35 @@ $pluginName = 'fpp-plugin-leviton-direct';
     showStatus({ ok: true, message: 'Settings saved', results });
   }
 
-  function guessProfileFromDeviceType(deviceType) {
-    const typeStr = (deviceType || '').toLowerCase().trim();
-    if (typeStr.includes('dw15p') || typeStr.includes('outlet')) {
+  function getDeviceModel(device) {
+    return device?.raw?.modelType || device?.raw?.model || device?.deviceType || 'unknown';
+  }
+
+  function guessProfileFromDevice(device) {
+    const modelStr = String(getDeviceModel(device)).toLowerCase().trim();
+    if (modelStr.includes('dw15p') || modelStr.includes('outlet')) {
       return 'dw15p';
     }
-    if (typeStr.includes('d26hd') || typeStr.includes('dimmer')) {
+    if (modelStr.includes('d26hd') || modelStr.includes('dimmer')) {
       return 'd26hd';
     }
     return 'default';
   }
 
   function selectDeviceFromDropdown(deviceId) {
-    console.log('selectDeviceFromDropdown called with:', deviceId);
-    console.log('discoveredDevices:', discoveredDevices);
-    if (!deviceId) {
-      console.log('No deviceId, returning');
+    const selectedId = String(deviceId || '').trim();
+    if (!selectedId) {
       return;
     }
-    const device = discoveredDevices.find(d => d.id === deviceId);
-    console.log('Found device:', device);
+    const device = discoveredDevices.find(d => String(d.id || '').trim() === selectedId);
     if (!device) {
-      console.log('Device not found');
+      showStatus({ ok: false, message: `Device ID ${selectedId} not found in discovered list.` });
       return;
     }
-    const profileName = guessProfileFromDeviceType(device.deviceType);
-    const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType;
-    document.getElementById('defaultSwitch').value = deviceId;
+    const profileName = guessProfileFromDevice(device);
+    const deviceModel = getDeviceModel(device);
+    document.getElementById('defaultSwitch').value = selectedId;
+    document.getElementById('quickSelectDevice').value = selectedId;
     applyProfile(profileName);
     showStatus({ ok: true, message: `Selected: ${device.name} (${deviceModel})` });
   }
@@ -271,17 +275,75 @@ $pluginName = 'fpp-plugin-leviton-direct';
 
   function populateQuickSelectDropdown() {
     const select = document.getElementById('quickSelectDevice');
-    select.innerHTML = '<option value="">-- No devices discovered --</option>';
+    select.innerHTML = '<option value="">-- Select discovered device --</option>';
     
     if (discoveredDevices.length === 0) return;
     
     discoveredDevices.forEach(device => {
       const option = document.createElement('option');
-      option.value = device.id;
-      const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType || 'unknown';
+      option.value = String(device.id || '');
+      const deviceModel = getDeviceModel(device);
       option.textContent = `${device.name} (${deviceModel})`;
       select.appendChild(option);
     });
+  }
+
+  function renderDiscoveredDevices(devices) {
+    if (!Array.isArray(devices) || devices.length === 0) {
+      document.getElementById('devicesOutput').innerHTML = 'No devices discovered.';
+      populateQuickSelectDropdown();
+      return;
+    }
+
+    let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
+    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Model</th><th style="text-align:center;padding:8px;">Action</th></tr>';
+
+    devices.forEach((device, index) => {
+      const guessedProfile = guessProfileFromDevice(device);
+      const profileLabel = guessedProfile === 'dw15p' ? 'DW15P' : guessedProfile === 'd26hd' ? 'D26HD' : 'Default';
+      const deviceId = String(device.id || '?');
+      const deviceName = device.name || `Device ${index + 1}`;
+      const deviceModel = getDeviceModel(device);
+
+      html += `<tr style="border-bottom:1px solid #333;">`;
+      html += `<td style="padding:8px;">${deviceName}</td>`;
+      html += `<td style="padding:8px;"><code>${deviceId}</code></td>`;
+      html += `<td style="padding:8px;">${deviceModel}</td>`;
+      html += `<td style="padding:8px; text-align:center;">`;
+      html += `<button class="buttons btn-outline-primary" style="padding:4px 8px; font-size:12px;" onclick="selectDeviceFromDropdown('${deviceId}')">Select (${profileLabel})</button>`;
+      html += `</td>`;
+      html += `</tr>`;
+    });
+
+    html += '</table>';
+    document.getElementById('devicesOutput').innerHTML = html;
+    populateQuickSelectDropdown();
+  }
+
+  async function saveDiscoveredDevices(devices) {
+    try {
+      await setSetting(discoveredDevicesSettingKey, JSON.stringify(devices || []));
+    } catch (err) {
+      showStatus(`Warning: unable to cache discovered devices: ${err}`);
+    }
+  }
+
+  async function loadDiscoveredDevicesFromCache() {
+    try {
+      const raw = await getSetting(discoveredDevicesSettingKey);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      discoveredDevices = parsed;
+      renderDiscoveredDevices(discoveredDevices);
+      showStatus({ ok: true, message: `Loaded ${discoveredDevices.length} cached device(s).` });
+    } catch (err) {
+      showStatus(`Warning: unable to load cached discovered devices: ${err}`);
+    }
   }
 
   async function discoverDevices() {
@@ -297,38 +359,8 @@ $pluginName = 'fpp-plugin-leviton-direct';
 
     const devices = data.devices || [];
     discoveredDevices = devices;
-    
-    if (devices.length === 0) {
-      document.getElementById('devicesOutput').textContent = 'No devices discovered.';
-      showStatus({ ok: true, message: 'No devices found.' });
-      populateQuickSelectDropdown();
-      return;
-    }
-
-    // Build HTML table
-    let html = '<table style="width:100%; border-collapse:collapse; color:#ddd;">';
-    html += '<tr style="border-bottom:1px solid #444;"><th style="text-align:left;padding:8px;">Name</th><th style="text-align:left;padding:8px;">ID</th><th style="text-align:left;padding:8px;">Model</th><th style="text-align:center;padding:8px;">Action</th></tr>';
-    
-    devices.forEach((device, index) => {
-      const guessedProfile = guessProfileFromDeviceType(device.deviceType);
-      const profileLabel = guessedProfile === 'dw15p' ? 'DW15P' : guessedProfile === 'd26hd' ? 'D26HD' : 'Default';
-      const deviceId = device.id || '?';
-      const deviceName = device.name || `Device ${index + 1}`;
-      const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType || 'unknown';
-      
-      html += `<tr style="border-bottom:1px solid #333;">`;
-      html += `<td style="padding:8px;">${deviceName}</td>`;
-      html += `<td style="padding:8px;"><code>${deviceId}</code></td>`;
-      html += `<td style="padding:8px;">${deviceModel}</td>`;
-      html += `<td style="padding:8px; text-align:center;">`;
-      html += `<button class="buttons btn-outline-primary" style="padding:4px 8px; font-size:12px;" onclick="selectDeviceFromDropdown('${deviceId}')">Select (${profileLabel})</button>`;
-      html += `</td>`;
-      html += `</tr>`;
-    });
-    
-    html += '</table>';
-    document.getElementById('devicesOutput').innerHTML = html;
-    populateQuickSelectDropdown();
+    renderDiscoveredDevices(discoveredDevices);
+    await saveDiscoveredDevices(discoveredDevices);
     showStatus({ ok: true, count: devices.length, message: `Discovered ${devices.length} device(s)` });
   }
 
@@ -370,11 +402,11 @@ $pluginName = 'fpp-plugin-leviton-direct';
   const quickSelectEl = document.getElementById('quickSelectDevice');
   if (quickSelectEl) {
     quickSelectEl.addEventListener('change', (e) => {
-      console.log('Dropdown changed to:', e.target.value);
       selectDeviceFromDropdown(e.target.value);
     });
   }
 
   loadSettings();
+  loadDiscoveredDevicesFromCache();
 })();
 </script>
