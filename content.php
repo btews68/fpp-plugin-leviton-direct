@@ -67,6 +67,8 @@ $pluginName = 'fpp-plugin-leviton-direct';
       <button id='discoverBtn' class='buttons btn-outline-primary'>Discover Devices</button>
       <button id='testOnBtn' class='buttons btn-outline-secondary'>Test ON (Default Switch)</button>
       <button id='testOffBtn' class='buttons btn-outline-secondary'>Test OFF (Default Switch)</button>
+      <input id='testLevelValue' type='number' min='0' max='100' value='40' style='width: 90px; margin-left: 8px;'>
+      <button id='testLevelBtn' class='buttons btn-outline-secondary'>Test LEVEL</button>
     </div>
   </div>
 
@@ -219,12 +221,16 @@ $pluginName = 'fpp-plugin-leviton-direct';
     showStatus(data.ok === false ? data : { ok: true, count: data.count || 0 });
   }
 
-  async function runAction(action) {
+  async function runAction(action, value = null) {
     const switchId = document.getElementById('defaultSwitch').value.trim();
     const payload = {
       action: action,
       switchId: switchId
     };
+
+    if (value !== null && value !== undefined && value !== '') {
+      payload.value = String(value);
+    }
 
     const resp = await fetch(`api/plugin/${plugin}/run`, {
       method: 'POST',
@@ -240,6 +246,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
   document.getElementById('discoverBtn').addEventListener('click', discoverDevices);
   document.getElementById('testOnBtn').addEventListener('click', () => runAction('on'));
   document.getElementById('testOffBtn').addEventListener('click', () => runAction('off'));
+  document.getElementById('testLevelBtn').addEventListener('click', () => {
+    const level = parseInt(document.getElementById('testLevelValue').value, 10);
+    if (Number.isNaN(level) || level < 0 || level > 100) {
+      showStatus('Test level must be an integer between 0 and 100.');
+      return;
+    }
+    runAction('level', level);
+  });
   document.getElementById('deviceProfile').addEventListener('change', (e) => applyProfile(e.target.value));
 
   loadSettings();

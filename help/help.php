@@ -10,3 +10,4 @@
   <li><b>Level Payload JSON</b>: optional JSON template for level action, supports <code>__LEVEL__</code> token</li>
 </ul>
 <p>Use <b>Discover Devices</b> to pull current switch IDs from your account.</p>
+<p>Use <b>Test LEVEL</b> with a 0-100 value to verify dimming behavior directly from the UI.</p>
