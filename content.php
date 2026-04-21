@@ -248,9 +248,18 @@ $pluginName = 'fpp-plugin-leviton-direct';
   }
 
   function selectDeviceFromDropdown(deviceId) {
-    if (!deviceId) return;
+    console.log('selectDeviceFromDropdown called with:', deviceId);
+    console.log('discoveredDevices:', discoveredDevices);
+    if (!deviceId) {
+      console.log('No deviceId, returning');
+      return;
+    }
     const device = discoveredDevices.find(d => d.id === deviceId);
-    if (!device) return;
+    console.log('Found device:', device);
+    if (!device) {
+      console.log('Device not found');
+      return;
+    }
     const profileName = guessProfileFromDeviceType(device.deviceType);
     const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType;
     document.getElementById('defaultSwitch').value = deviceId;
@@ -269,7 +278,8 @@ $pluginName = 'fpp-plugin-leviton-direct';
     discoveredDevices.forEach(device => {
       const option = document.createElement('option');
       option.value = device.id;
-      option.textContent = `${device.name} (${device.model || device.deviceType})`;
+      const deviceModel = device.raw?.modelType || device.raw?.model || device.deviceType || 'unknown';
+      option.textContent = `${device.name} (${deviceModel})`;
       select.appendChild(option);
     });
   }
@@ -356,7 +366,14 @@ $pluginName = 'fpp-plugin-leviton-direct';
     runAction('level', level);
   });
   document.getElementById('deviceProfile').addEventListener('change', (e) => applyProfile(e.target.value));
-  document.getElementById('quickSelectDevice').addEventListener('change', (e) => selectDeviceFromDropdown(e.target.value));
+  
+  const quickSelectEl = document.getElementById('quickSelectDevice');
+  if (quickSelectEl) {
+    quickSelectEl.addEventListener('change', (e) => {
+      console.log('Dropdown changed to:', e.target.value);
+      selectDeviceFromDropdown(e.target.value);
+    });
+  }
 
   loadSettings();
 })();
