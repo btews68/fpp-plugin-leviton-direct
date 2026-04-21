@@ -55,13 +55,26 @@ def parse_json_setting(cfg: dict, key: str, default: dict) -> dict:
     return parsed
 
 
+def parse_json_list_setting(cfg: dict, key: str, default: list) -> list:
+    raw = cfg.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        die(f"Invalid JSON in {key}: {exc}", 4)
+    if not isinstance(parsed, list):
+        die(f"{key} must be a JSON array", 4)
+    return parsed
+
+
 def _extract_alias_target(value) -> str:
     if isinstance(value, dict):
         return _norm_id(value.get("id") or value.get("switchId"))
     return _norm_id(value)
 
 
-def resolve_switch_id(requested: str, default_switch_id: str, aliases: dict) -> tuple[str, str]:
+def resolve_switch_id(requested: str, default_switch_id: str, aliases: dict, discovered_devices: list) -> tuple[str, str]:
     """
     Resolve a switch target by explicit ID/alias, then fallback to default ID/alias.
     Returns (resolved_switch_id, alias_used).
@@ -88,6 +101,31 @@ def resolve_switch_id(requested: str, default_switch_id: str, aliases: dict) -> 
             target = _extract_alias_target(alias_value)
             if target:
                 return target, str(alias_name)
+
+        # Match candidate against alias display-name fields.
+        for alias_name, alias_value in aliases.items():
+            if not isinstance(alias_value, dict):
+                continue
+            display_name = str(alias_value.get("name", "")).strip()
+            if display_name and display_name.lower() == lowered:
+                target = _extract_alias_target(alias_value)
+                if target:
+                    return target, str(alias_name)
+
+    # Final fallback: match discovered device name/model to an ID.
+    if isinstance(discovered_devices, list):
+        lowered = candidate.lower()
+        for device in discovered_devices:
+            if not isinstance(device, dict):
+                continue
+            d_id = _norm_id(device.get("id"))
+            if not d_id:
+                continue
+            d_name = str(device.get("name", "")).strip().lower()
+            raw = device.get("raw") if isinstance(device.get("raw"), dict) else {}
+            d_model = str(raw.get("modelType") or raw.get("model") or device.get("deviceType") or "").strip().lower()
+            if lowered and (lowered == d_name or lowered == d_model):
+                return d_id, ""
 
     return candidate, ""
 
@@ -374,6 +412,7 @@ def main() -> int:
     off_payload = parse_json_setting(cfg, "LEVITON_OFF_PAYLOAD", {"status": "off"})
     level_payload_template = parse_json_setting(cfg, "LEVITON_LEVEL_PAYLOAD", {})
     device_aliases = parse_json_setting(cfg, "LEVITON_DEVICE_ALIASES", {})
+    discovered_devices = parse_json_list_setting(cfg, "LEVITON_DISCOVERED_DEVICES", [])
 
     if not email or not password:
         die(
@@ -392,7 +431,12 @@ def main() -> int:
         die("Usage: leviton_control.py <switch_id> <on|off|level|raw> [value]", 2)
 
     requested_switch = sys.argv[1].strip()
-    switch_id, alias_used = resolve_switch_id(requested_switch, default_switch_id, device_aliases)
+    switch_id, alias_used = resolve_switch_id(
+        requested_switch,
+        default_switch_id,
+        device_aliases,
+        discovered_devices,
+    )
     action = sys.argv[2].strip().lower()
     value = sys.argv[3] if len(sys.argv) > 3 else ""
 
