@@ -1,0 +1,10 @@
+<h2>Leviton Direct Plugin Help</h2>
+<p>Use <b>Configuration</b> to set your credentials and device-level behavior.</p>
+<ul>
+  <li><b>Username / Email</b>: your myLeviton login</li>
+  <li><b>Password</b>: your myLeviton password</li>
+  <li><b>Default Switch ID</b>: optional switch used when command does not include a switch ID</li>
+  <li><b>Level Key</b>: payload key used for dim/level updates (default: brightness)</li>
+  <li><b>On/Off Payload JSON</b>: model-specific payload mapping</li>
+</ul>
+<p>Use <b>Discover Devices</b> to pull current switch IDs from your account.</p>

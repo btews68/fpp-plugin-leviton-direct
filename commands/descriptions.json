@@ -1,0 +1,7 @@
+[
+  {
+    "name": "Leviton Switch Action",
+    "script": "leviton_action.sh",
+    "args": []
+  }
+]
