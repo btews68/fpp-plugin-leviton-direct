@@ -144,6 +144,21 @@ $pluginName = 'fpp-plugin-leviton-direct';
     }
   };
 
+  // Hardcoded model mapping (model numbers only) for known Leviton devices.
+  // Values map to the payload profile keys above.
+  const modelProfileRules = {
+    // Dimmers
+    D26HD: 'd26hd',
+    DW6HD: 'd26hd',
+    D24SF: 'd26hd',
+
+    // Switches / outlets / plugs
+    DW15P: 'dw15p',
+    DW15S: 'dw15p',
+    D215P: 'dw15p',
+    D215S: 'dw15p'
+  };
+
   function showStatus(obj) {
     document.getElementById('statusOutput').textContent =
       typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
@@ -269,16 +284,24 @@ $pluginName = 'fpp-plugin-leviton-direct';
     return `model:${String(modelName || '').trim()}`;
   }
 
+  function normalizeModelKey(modelName) {
+    return String(modelName || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
   function guessProfileFromModel(modelName) {
     const modelStr = String(modelName || '').toLowerCase().trim();
+    const normalized = normalizeModelKey(modelName);
 
     if (!modelStr || modelStr === 'unknown') {
       return 'default';
     }
 
+    if (modelProfileRules[normalized]) {
+      return modelProfileRules[normalized];
+    }
+
     if (
       modelStr.includes('d26hd') ||
-      modelStr.includes('d24') ||
       modelStr.includes('dw6hd') ||
       modelStr.includes('dimmer')
     ) {
