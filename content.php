@@ -476,9 +476,7 @@ $pluginName = 'fpp-plugin-leviton-direct';
     const modelProfileOptionValue = getModelProfileOptionValue(deviceModel);
     document.getElementById('defaultSwitch').value = selectedId;
     document.getElementById('quickSelectDevice').value = selectedId;
-    if (!document.getElementById('aliasName').value.trim()) {
-      document.getElementById('aliasName').value = String(device.name || '').trim();
-    }
+    document.getElementById('aliasName').value = String(device.name || '').trim();
     const hasModelOption = Array.from(document.getElementById('deviceProfile').options)
       .some(opt => opt.value === modelProfileOptionValue);
     applyProfile(hasModelOption ? modelProfileOptionValue : profileName);
