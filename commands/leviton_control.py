@@ -114,9 +114,35 @@ def _api_get(session: DecoraWiFiSession, path: str):
 def _discover_switches_fallback(session: DecoraWiFiSession, diagnostics: list) -> list:
     switches = []
 
+    # Path A: logged-in user -> residential permissions -> residence -> iot switches
+    try:
+        if getattr(session, "user", None) is not None and hasattr(session.user, "get_residential_permissions"):
+            perms = session.user.get_residential_permissions() or []
+            diagnostics.append(f"user.get_residential_permissions() returned {len(perms)} permission(s)")
+            for perm in perms:
+                try:
+                    residence = perm.get_residence()
+                    residence_id = getattr(residence, "_id", None) or (residence.data or {}).get("id")
+                    if not residence_id:
+                        continue
+                    found = residence.get_iot_switches() or []
+                    diagnostics.append(
+                        f"permission->residence {residence_id} get_iot_switches() returned {len(found)} switch(es)"
+                    )
+                    for item in found:
+                        switches.append(getattr(item, "data", {}) or {})
+                except Exception as exc:
+                    diagnostics.append(f"permission-based residence discovery failed: {exc}")
+    except Exception as exc:
+        diagnostics.append(f"user.get_residential_permissions() failed: {exc}")
+
     # Try ResidentialAccounts -> residences -> iotSwitches
-    accounts = _api_get(session, "/ResidentialAccounts") or []
-    diagnostics.append(f"/ResidentialAccounts returned {len(accounts)} account(s)")
+    accounts = []
+    try:
+        accounts = _api_get(session, "/ResidentialAccounts") or []
+        diagnostics.append(f"/ResidentialAccounts returned {len(accounts)} account(s)")
+    except Exception as exc:
+        diagnostics.append(f"/ResidentialAccounts failed: {exc}")
 
     for account in accounts:
         account_id = account.get("id")
